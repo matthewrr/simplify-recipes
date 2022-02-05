@@ -1,19 +1,26 @@
 import re, requests
 from bs4 import BeautifulSoup
 
-def get_text(url):
-    reqs = requests.get(url)
-    soup = BeautifulSoup(reqs.text, 'html.parser')
+ingredient_header = ['ingredients', 'ingredients:']
+instructions_header = ['instructions', 'instructions:', 'steps', 'steps:', 'directions', 'directions:']
+url = 'https://damndelicious.net/2014/12/13/pasta-sun-dried-tomato-cream-sauce/'
+
+def get_text(soup):
     for header in soup.find_all(re.compile('^h[1-6]$')):
-        if (header.text).lower() in ["ingredients","ingredients:"]:
-            print('-------------------------------------')
-            ingredients = header.parent
-            for bullet in ingredients.findAll('li'):
-                print(bullet.text)
+        header_text = (header.text).lower()
+        if header_text in ingredient_header:
+            ingredients = [ingredient.text for ingredient in header.parent.findAll('li')]
+        elif header_text in instructions_header:
+            instructions = [instruction.text for instruction in header.parent.findAll('li')]
+    return [instructions, ingredients]
 
-urls = ['https://damndelicious.net/2014/12/13/pasta-sun-dried-tomato-cream-sauce/',
-        'https://www.recipetineats.com/chicken-with-creamy-sun-dried-tomato-sauce/',
-       ]
+def simplify_recipe(url):
+    reqs = requests.get(url)
+    soup = BeautifulSoup(reqs.text, 'html.parser') 
+    instructions, ingredients = get_text(soup)
 
-for url in urls:
-    get_text(url)
+simplify_recipe(url)
+
+# urls = ['https://damndelicious.net/2014/12/13/pasta-sun-dried-tomato-cream-sauce/',
+    #     'https://www.recipetineats.com/chicken-with-creamy-sun-dried-tomato-sauce/',
+    #    ]

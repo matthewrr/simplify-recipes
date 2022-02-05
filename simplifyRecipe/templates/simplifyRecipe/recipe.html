@@ -1,0 +1,22 @@
+<form action = "" method = "POST">
+    {% csrf_token %}
+    <label for="url">Recipe URL: </label>
+    <input id="url" type="text" name="url">
+    <input type="submit" value="OK">
+</form>
+
+<header>
+    <h1><a href="/">{{ title }}</a></h1>
+</header>
+
+<ul>
+{% for ingredient in ingredients %}
+    <li>{{ ingredient }}</li>
+{% endfor %}
+</ul>
+
+<ol>
+{% for instruction in instructions %}
+    <li>{{ instruction }}</li>
+{% endfor %}
+</ol>
