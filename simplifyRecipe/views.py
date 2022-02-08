@@ -19,16 +19,17 @@ def get_text(soup, url):
     return {'ingredients': ingredients, 'instructions': instructions, 'source': source, 'title': title, 'url': url, 'valid_url': True, 'extraction': True}
 
 def simplify_recipe(request):
-    recipe_data = {'valid_url': False, 'extraction': False}
+    recipe_data = {'valid_url': False, 'extraction': False, 'modal': False}
     if request.method == 'POST':
         url = request.POST['url']
+        recipe_data['url'] = url
         try:
             r = requests.get(url)
             soup = BeautifulSoup(r.text, 'html.parser') 
             recipe_data = get_text(soup, url)
         except UnboundLocalError as err:
             recipe_data['valid_url'] = True
-            print('UnboundLocalError. Could not extract data from valid URL.')
+            recipe_data['modal'] = 'failed_extraction'
         except requests.exceptions.MissingSchema as err:
-            print('Missing Schema')
+            recipe_data['modal'] = 'invalid_url'
     return render(request, 'simplifyRecipe/recipe_temp.html', recipe_data)
