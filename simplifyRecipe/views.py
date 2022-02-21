@@ -1,3 +1,4 @@
+from colorsys import TWO_THIRD
 from django.shortcuts import render
 
 import re, requests
@@ -6,19 +7,56 @@ from urllib.parse import urlparse
 
 ingredient_header = ['ingredients', 'ingredients:']
 instructions_header = ['instructions', 'instructions:', 'steps', 'steps:', 'directions', 'directions:']
+url_list = [
+    'https://www.averiecooks.com/garlic-butter-chicken/',
+    'https://recipeland.com/recipe/v/bhg-fudge-brownies-50409',
+    'https://www.southernliving.com/recipes/slow-cooker-french-onion-soup',
+    'https://www.allrecipes.com/recipe/81568/afghan-beef-raviolis-mantwo/',
+    'https://food52.com/recipes/87369-best-cajun-chicken-and-rice-recipe', #double sections
+    'https://www.foodnetwork.com/recipes/ree-drummond/cinnamon-baked-french-toast-recipe-2120484',
+    'https://www.yummly.com/recipe/Black-Bean-Chili-9093664',
+
+]
+#double sections --> see food52
+#foodnetwork (had to parent up... works now)
+#yummly... only li, no ol/ul. requires captcha
+#epicurious requires login
+
+# Map:
+# Outer Tag --> ol, ul, tr, None
+# Inner Tag --> li, p
+# Number of Nests --> int
+# Number of Parents --> int
+# Note: better way than parenting up.
+
+d = {'example.com': {
+        'ingredients': {
+            'outer': 1,
+            'inner': 1,
+            'nests': 1,
+            'parents': 1,
+        },
+        'instructions': {
+            'outer': 1,
+            'inner': 1,
+            'nests': 1,
+            'parents': 1,
+        }
+    }
+}
+
+reasons = ['captcha', 'login', 'invalid_url', 'other']
+d = {'example.com': 'reason'}
+# regularly audit both full pulls for popular websites and simple len of items to see if website design changed.
 
 def extract_data(header):
+
     pattern = re.compile(r'[^\x11-\x7f\u00BC-\u00BE]') #standard ascii minus first 11 (10 is newline) plus fractions
-    unnested = ['p']
+    unnested = ['p', 'li'] #yummly doesn't have ol/ul
     nested_single = {'tr':'td'}
     nested_multiple = {'ul':'li','ol':'li','tr':'td'}
     result = []
 
-    for tag in unnested:
-        items = header.findAll(tag)
-        for item in items:
-            result.append(re.sub(pattern, r'', item.text))
-        if result: return result
     for k, v in nested_single.items():
         parent_items = header.findAll(k) 
         for item in parent_items:
@@ -43,6 +81,12 @@ def extract_data(header):
                 ' '.join(temp)
                 result.append(' '.join(temp))
         if result: return result
+    for tag in unnested:
+        print('stage 1')
+        items = header.findAll(tag)
+        for item in items:
+            result.append(re.sub(pattern, r'', item.text))
+        if result: return result
     return result
 
 def get_recipe(soup, url):
@@ -53,9 +97,13 @@ def get_recipe(soup, url):
         if header_text in ingredient_header:
             ingredients = extract_data(header.parent)
             if not ingredients: ingredients = extract_data(header.parent.parent)
+            if not ingredients: ingredients = extract_data(header.parent.parent.parent)
         elif header_text in instructions_header:
             instructions = extract_data(header.parent)
-            if not instructions: extract_data(header.parent.parent)
+            if not instructions: instructions = extract_data(header.parent.parent)
+            if not instructions: instructions = extract_data(header.parent.parent.parent)
+          
+            print('----------END INSTRUCTIONS----------')
     return {'ingredients': ingredients, 'instructions': instructions, 'source': source, 'title': title, 'url': url, 'valid_url': True, 'extraction': True}
 
 def simplify_recipe(request):
