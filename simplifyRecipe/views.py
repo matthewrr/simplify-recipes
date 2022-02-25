@@ -8,12 +8,19 @@ url_dict = {}
 ingredient_label = ['Ingredients', 'Ingredients:', 'ingredients', 'ingredients:']
 instruction_label = ['instructions', 'instructions:', 'steps', 'steps:', 'directions', 'directions:',
     'Instructions', 'Instructions:', 'Steps', 'Steps:', 'Directions', 'Directions:']
+#use regex
 
-def log_url(new_data):
-    # new_data = {'mysite123.com': 'Best Site!'}
+def log_url(url_dict):
     with open(os.path.abspath(os.getcwd()) + '/simplifyRecipe/static/json/websites.json', 'r+') as file:
         file_data = json.load(file)
-        file_data['websites'].append(new_data)
+
+        #check if alredy logged
+        base_url = list(url_dict.keys())[0]
+        if file_data['websites'][0].get(base_url):
+            return
+
+        #log base URL if new to file
+        file_data['websites'].append(url_dict)
         file.seek(0)
         json.dump(file_data, file, indent = 4)
     return
@@ -32,6 +39,7 @@ def simple_tags(section, header_label):
     tags = ['p','li']
     pattern = re.compile(r'[^\x11-\x7f\u00BC-\u00BE]')
     for tag in tags:
+        #don't need to append
         result.append([re.sub(pattern, r'', item.text) for item in section.findAll(tag)])
         if result:
             url_dict[header_label]['tags'] = {
