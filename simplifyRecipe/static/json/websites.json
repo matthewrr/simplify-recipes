@@ -1,0 +1,28 @@
+{
+    "websites": [
+        {
+            "www.averiecooks.com": {
+                "ingredients": {
+                    "parent_height": 0,
+                    "tags": {
+                        "single": false,
+                        "tag_label": {
+                            "ul": "li"
+                        }
+                    },
+                    "combine": null
+                },
+                "instructions": {
+                    "parent_height": 0,
+                    "tags": {
+                        "single": false,
+                        "tag_label": {
+                            "ol": "li"
+                        }
+                    },
+                    "combine": null
+                }
+            }
+        }
+    ]
+}

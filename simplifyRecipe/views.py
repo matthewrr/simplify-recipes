@@ -1,127 +1,112 @@
-from colorsys import TWO_THIRD
 from django.shortcuts import render
 
-import re, requests
+import os, json, re, requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 
-ingredient_header = ['ingredients', 'ingredients:']
-instructions_header = ['instructions', 'instructions:', 'steps', 'steps:', 'directions', 'directions:']
-url_list = [
-    'https://www.averiecooks.com/garlic-butter-chicken/',
-    'https://recipeland.com/recipe/v/bhg-fudge-brownies-50409',
-    'https://www.southernliving.com/recipes/slow-cooker-french-onion-soup',
-    'https://www.allrecipes.com/recipe/81568/afghan-beef-raviolis-mantwo/',
-    'https://food52.com/recipes/87369-best-cajun-chicken-and-rice-recipe', #double sections
-    'https://www.foodnetwork.com/recipes/ree-drummond/cinnamon-baked-french-toast-recipe-2120484',
-    'https://www.yummly.com/recipe/Black-Bean-Chili-9093664',
+url_dict = {}
+ingredient_label = ['Ingredients', 'Ingredients:', 'ingredients', 'ingredients:']
+instruction_label = ['instructions', 'instructions:', 'steps', 'steps:', 'directions', 'directions:',
+    'Instructions', 'Instructions:', 'Steps', 'Steps:', 'Directions', 'Directions:']
 
-]
-#double sections --> see food52
-#foodnetwork (had to parent up... works now)
-#yummly... only li, no ol/ul. requires captcha
-#epicurious requires login
+def log_url(new_data):
+    # new_data = {'mysite123.com': 'Best Site!'}
+    with open(os.path.abspath(os.getcwd()) + '/simplifyRecipe/static/json/websites.json', 'r+') as file:
+        file_data = json.load(file)
+        file_data['websites'].append(new_data)
+        file.seek(0)
+        json.dump(file_data, file, indent = 4)
+    return
 
-# Map:
-# Outer Tag --> ol, ul, tr, None
-# Inner Tag --> li, p
-# Number of Nests --> int
-# Number of Parents --> int
-# Note: better way than parenting up.
-
-d = {'example.com': {
-        'ingredients': {
-            'outer': 1,
-            'inner': 1,
-            'nests': 1,
-            'parents': 1,
-        },
-        'instructions': {
-            'outer': 1,
-            'inner': 1,
-            'nests': 1,
-            'parents': 1,
-        }
-    }
-}
-
-reasons = ['captcha', 'login', 'invalid_url', 'other']
-d = {'example.com': 'reason'}
-# regularly audit both full pulls for popular websites and simple len of items to see if website design changed.
-
-def extract_data(header):
-
-    pattern = re.compile(r'[^\x11-\x7f\u00BC-\u00BE]') #standard ascii minus first 11 (10 is newline) plus fractions
-    unnested = ['p', 'li'] #yummly doesn't have ol/ul
-    nested_single = {'tr':'td'}
-    nested_multiple = {'ul':'li','ol':'li','tr':'td'}
+def combine(child_objs, header_label):
     result = []
+    for obj in child_objs:
+        content = obj.findAll(text=True)
+        foo = ' '.join([item.strip() for item in content if item.strip()])
+        result.append(foo)
+    if result: url_dict[header_label]['combine'] = True
+    return result
 
-    for k, v in nested_single.items():
-        parent_items = header.findAll(k) 
-        for item in parent_items:
-            child_items = item.findAll(v) #combine with finding text
-            l = [child.text for child in child_items]
-            result.append(' '.join(l))
-        if len(result) > 1:
+def simple_tags(section, header_label):
+    result = []
+    tags = ['p','li']
+    pattern = re.compile(r'[^\x11-\x7f\u00BC-\u00BE]')
+    for tag in tags:
+        result.append([re.sub(pattern, r'', item.text) for item in section.findAll(tag)])
+        if result:
+            url_dict[header_label]['tags'] = {
+                'single': True,
+                'tag_label': tag
+            }
             return result
-        else:
-            result.clear()
-    for k, v in nested_multiple.items():
-        parent_items = header.findAll(k)
-        for item in parent_items:
-            child_items = item.findAll(v)
-            for child_item in child_items:
-                find_text = child_item.findAll(text=True)
-                temp = []
-                for item in find_text:
-                    stripped = item.strip()
-                    if stripped:
-                        temp.append(stripped)
-                ' '.join(temp)
-                result.append(' '.join(temp))
-        if result: return result
-    for tag in unnested:
-        print('stage 1')
-        items = header.findAll(tag)
-        for item in items:
-            result.append(re.sub(pattern, r'', item.text))
-        if result: return result
+        #ever need to combine?
+    return result
+
+def nested_tags(section, header_label):
+    result = []
+    tags = {'ul':'li','ol':'li','tr':'td'}
+    for parent, child in tags.items():
+        parent_objs = section.findAll(parent)
+        for parent_obj in parent_objs:
+            child_objs = parent_obj.findAll(child)
+            content = [item.text for item in child_objs]
+            if content:
+                result += content
+                url_dict[header_label]['tags'] = {
+                    'single': False,
+                    'tag_label': {parent:child}
+                    }
+            else: result = combine(child_objs, header_label)
+    return result
+
+def get_data(section, header_label):
+    structs = [nested_tags, simple_tags]
+    for struct in structs:
+        for i in range(4):
+            result = struct(section, header_label)
+            if result:
+                url_dict[header_label]['parent_height'] = i
+                return result
+            else: section = section.parent
     return result
 
 def get_recipe(soup, url):
-    source = urlparse(url).hostname
-    title = soup.find('h1').text
-    for header in soup.find_all(re.compile('^h[1-6]$')):
-        header_text = (header.text.lower()).strip()
-        if header_text in ingredient_header:
-            ingredients = extract_data(header.parent)
-            if not ingredients: ingredients = extract_data(header.parent.parent)
-            if not ingredients: ingredients = extract_data(header.parent.parent.parent)
-        elif header_text in instructions_header:
-            instructions = extract_data(header.parent)
-            if not instructions: instructions = extract_data(header.parent.parent)
-            if not instructions: instructions = extract_data(header.parent.parent.parent)
-          
-            print('----------END INSTRUCTIONS----------')
-    return {'ingredients': ingredients, 'instructions': instructions, 'source': source, 'title': title, 'url': url, 'valid_url': True, 'extraction': True}
+    base_url = urlparse(url).hostname
+    page_title = soup.find('h1').text
+    #check if page_title exists
+    
+    keys = ['parent_height', 'tags', 'combine']
+    url_dict.update({
+        'ingredients': dict.fromkeys(keys),
+        'instructions': dict.fromkeys(keys)
+        })
+
+    ingredients_header = soup.find(re.compile('^h[1-6]$'), string=ingredient_label)
+    instructions_header = soup.find(re.compile('^h[1-6]$'), string=instruction_label)
+    ingredients = get_data(ingredients_header.parent, 'ingredients')
+    instructions = get_data(instructions_header.parent, 'instructions')
+    context = {
+        'base_url': base_url,
+        'title': page_title,
+        'ingredients': ingredients,
+        'instructions': instructions,
+    }
+    log_url({base_url: url_dict})
+    return context
 
 def simplify_recipe(request):
-    recipe_data = {'valid_url': False, 'extraction': False, 'modal': False}
+    context = {'valid_url': True, 'extraction': True, 'modal': False}
     if request.method == 'POST':
         url = request.POST['url']
-        recipe_data['url'] = url
+        context['url'] = url
         try:
             r = requests.get(url)
             soup = BeautifulSoup(r.text, 'html.parser') 
-            recipe_data = get_recipe(soup, url)
+            context = get_recipe(soup, url)
+            context.update(url=True,valid_url=True,extraction=True)
         except UnboundLocalError as err:
-            recipe_data['valid_url'] = True
-            recipe_data['modal'] = 'failed_extraction'
+            context['modal'] = 'failed_extraction'
         except requests.exceptions.MissingSchema as err:
-            recipe_data['modal'] = 'invalid_url'
-    return render(request, 'simplifyRecipe/recipe_card.html', recipe_data)
+            context['modal'] = 'invalid_url'
 
-#list sites that require sign-in
-#error out if no bullets
-#https://recipeland.com/recipe/v/bhg-fudge-brownies-50409 table, paragraphs, metric issue
+    return render(request, 'simplifyRecipe/recipe_card.html', context)

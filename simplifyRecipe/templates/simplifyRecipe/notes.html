@@ -1,0 +1,22 @@
+url_list = [
+    'https://www.averiecooks.com/garlic-butter-chicken/',
+    'https://recipeland.com/recipe/v/bhg-fudge-brownies-50409',
+    'https://www.southernliving.com/recipes/slow-cooker-french-onion-soup',
+    'https://www.allrecipes.com/recipe/81568/afghan-beef-raviolis-mantwo/',
+    'https://food52.com/recipes/87369-best-cajun-chicken-and-rice-recipe', #double sections
+    'https://www.foodnetwork.com/recipes/ree-drummond/cinnamon-baked-french-toast-recipe-2120484',
+    'https://www.yummly.com/recipe/Black-Bean-Chili-9093664',
+
+]
+
+# refactor json to dict
+#double sections --> see food52
+#foodnetwork (had to parent up... works now)
+#yummly... only li, no ol/ul. requires captcha
+#epicurious requires login
+#https://recipeland.com/recipe/v/bhg-fudge-brownies-50409 table, paragraphs, metric issue
+
+# reasons = ['captcha', 'login', 'invalid_url', 'other']
+# regularly audit both full pulls for popular websites and simple len of items to see if website design changed.
+
+#account for non-working urls. move json entry to initial call after error handling.
