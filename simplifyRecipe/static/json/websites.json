@@ -25,13 +25,32 @@
             }
         },
         {
-            "recipeland.com": {
+            "www.foodnetwork.com": {
                 "ingredients": {
-                    "parent_height": 0,
+                    "parent_height": 3,
+                    "tags": null,
+                    "combine": null
+                },
+                "instructions": {
+                    "parent_height": 3,
                     "tags": {
                         "single": false,
                         "tag_label": {
-                            "tr": "td"
+                            "ol": "li"
+                        }
+                    },
+                    "combine": null
+                }
+            }
+        },
+        {
+            "www.southernliving.com": {
+                "ingredients": {
+                    "parent_height": 2,
+                    "tags": {
+                        "single": false,
+                        "tag_label": {
+                            "ul": "li"
                         }
                     },
                     "combine": null
@@ -41,7 +60,7 @@
                     "tags": {
                         "single": false,
                         "tag_label": {
-                            "tr": "td"
+                            "ul": "li"
                         }
                     },
                     "combine": null

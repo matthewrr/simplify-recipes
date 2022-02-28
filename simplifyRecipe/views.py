@@ -16,10 +16,15 @@ def log_url(url_dict):
 
         #check if alredy logged
         base_url = list(url_dict.keys())[0]
-        if file_data['websites'][0].get(base_url):
+        website_list = file_data['websites']
+        all_websites = []
+        for item in website_list:
+            all_websites.append(list(item)[0])
+
+        if base_url in all_websites:
             return
 
-        #log base URL if new to file
+        #log base URL if new to JSON file
         file_data['websites'].append(url_dict)
         file.seek(0)
         json.dump(file_data, file, indent = 4)
@@ -32,50 +37,56 @@ def combine(child_objs, header_label):
         foo = ' '.join([item.strip() for item in content if item.strip()])
         result.append(foo)
     if result: url_dict[header_label]['combine'] = True
-    return result
+    return ' '.join(result)
 
-def simple_tags(section, header_label):
+def simple_tags(section, header_label, tag):
     result = []
-    tags = ['p','li']
     pattern = re.compile(r'[^\x11-\x7f\u00BC-\u00BE]')
-    for tag in tags:
-        #don't need to append
-        result.append([re.sub(pattern, r'', item.text) for item in section.findAll(tag)])
-        if result:
-            url_dict[header_label]['tags'] = {
-                'single': True,
-                'tag_label': tag
-            }
-            return result
-        #ever need to combine?
+    try:
+        result = [item.text for item in section.findAll(tag)]
+    except:
+        pass
+    if result:
+        url_dict[header_label]['tags'] = {
+            'single': True,
+            'tag_label': tag
+        }
+        return result
     return result
 
 def nested_tags(section, header_label):
     result = []
     tags = {'ul':'li','ol':'li','tr':'td'}
     for parent, child in tags.items():
-        parent_objs = section.findAll(parent)
+        parent_objs = []
+        try: parent_objs = section.findAll(parent)
+        except: continue
         for parent_obj in parent_objs:
             child_objs = parent_obj.findAll(child)
             content = [item.text for item in child_objs]
-            if content:
+            if parent == 'tr':
+                result.append(combine(child_objs, header_label, section))
+            elif content: 
                 result += content
                 url_dict[header_label]['tags'] = {
                     'single': False,
                     'tag_label': {parent:child}
-                    }
-            else: result = combine(child_objs, header_label)
+                }
+    #try single tags
+    if not result:
+        for tag in ['p']: #leave room open for additional tags
+            result = simple_tags(section, header_label, tag)
+            if result: return result
     return result
 
 def get_data(section, header_label):
-    structs = [nested_tags, simple_tags]
-    for struct in structs:
-        for i in range(4):
-            result = struct(section, header_label)
-            if result:
-                url_dict[header_label]['parent_height'] = i
-                return result
-            else: section = section.parent
+    result = []
+    for i in range(4):
+        result = nested_tags(section, header_label)
+        if result:
+            url_dict[header_label]['parent_height'] = i
+            return result
+        section = section.parent #best practice to use else?
     return result
 
 def get_recipe(soup, url):
@@ -87,12 +98,15 @@ def get_recipe(soup, url):
     url_dict.update({
         'ingredients': dict.fromkeys(keys),
         'instructions': dict.fromkeys(keys)
-        })
-
-    ingredients_header = soup.find(re.compile('^h[1-6]$'), string=ingredient_label)
-    instructions_header = soup.find(re.compile('^h[1-6]$'), string=instruction_label)
-    ingredients = get_data(ingredients_header.parent, 'ingredients')
-    instructions = get_data(instructions_header.parent, 'instructions')
+    })
+    lst = soup.find_all(re.compile('^h[2-6]$'))
+    for i in lst:
+        if (i.text).strip() in instruction_label:
+            instructions_header = i
+        elif (i.text).strip() in ingredient_label:
+            ingredients_header = i
+    ingredients = get_data(ingredients_header, 'ingredients')
+    instructions = get_data(instructions_header, 'instructions')
     context = {
         'base_url': base_url,
         'title': page_title,

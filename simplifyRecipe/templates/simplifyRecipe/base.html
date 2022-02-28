@@ -26,18 +26,3 @@
         <script src="{% static 'js/script.js' %}"></script>
     </body>
 </html>
-
-def scattered_tags(section):
-    result = []
-    tags = {'ul':'li','ol':'li','tr':'td'}
-    for parent, child in tags.items():
-        parent_objs = section.findAll(parent)
-        for parent_obj in parent_objs:
-            child_objs = parent_obj.findAll(child)
-            for child_obj in child_objs:
-                content = child_obj.findAll(text=True)
-                foo = ' '.join([item.strip() for item in content if item.strip()])
-                result.append(foo)
-            if result:
-                return result
-    return result
