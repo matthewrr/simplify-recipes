@@ -1,7 +1,6 @@
-from django.shortcuts import render
-
 import os, json, re, requests
 from bs4 import BeautifulSoup
+from django.shortcuts import render
 from urllib.parse import urlparse
 
 url_dict = {}
@@ -13,18 +12,8 @@ instruction_label = ['instructions', 'instructions:', 'steps', 'steps:', 'direct
 def log_url(url_dict):
     with open(os.path.abspath(os.getcwd()) + '/simplifyRecipe/static/json/websites.json', 'r+') as file:
         file_data = json.load(file)
-
-        #check if alredy logged
-        base_url = list(url_dict.keys())[0]
-        website_list = file_data['websites']
-        all_websites = []
-        for item in website_list:
-            all_websites.append(list(item)[0])
-
-        if base_url in all_websites:
-            return
-
-        #log base URL if new to JSON file
+        website_list = [list(item)[0] for item in file_data['websites']]
+        if list(url_dict)[0] in website_list: return #return if website already logged, otherwise log
         file_data['websites'].append(url_dict)
         file.seek(0)
         json.dump(file_data, file, indent = 4)
@@ -36,22 +25,18 @@ def combine(child_objs, header_label):
         content = obj.findAll(text=True)
         foo = ' '.join([item.strip() for item in content if item.strip()])
         result.append(foo)
-    if result: url_dict[header_label]['combine'] = True
+    url_dict[header_label]['combine'] = True #add exception for false need to combine?
     return ' '.join(result)
 
 def simple_tags(section, header_label, tag):
-    result = []
-    pattern = re.compile(r'[^\x11-\x7f\u00BC-\u00BE]')
     try:
         result = [item.text for item in section.findAll(tag)]
-    except:
-        pass
-    if result:
-        url_dict[header_label]['tags'] = {
-            'single': True,
-            'tag_label': tag
-        }
-        return result
+        if result:
+            url_dict[header_label]['tags'] = {
+                'single': True,
+                'tag_label': tag
+            }
+    except: pass
     return result
 
 def nested_tags(section, header_label):
@@ -79,34 +64,32 @@ def nested_tags(section, header_label):
             if result: return result
     return result
 
-def get_data(section, header_label):
-    result = []
-    for i in range(4):
+def parent_height_controller(section, header_label):
+    for i in range(4): #possibly expand if necessary
         result = nested_tags(section, header_label)
         if result:
             url_dict[header_label]['parent_height'] = i
             return result
         section = section.parent #best practice to use else?
-    return result
+    return []
 
 def get_recipe(soup, url):
     base_url = urlparse(url).hostname
     page_title = soup.find('h1').text
     #check if page_title exists
-    
-    keys = ['parent_height', 'tags', 'combine']
+    key_dict = dict.fromkeys(['parent_height', 'tags', 'combine'])
     url_dict.update({
-        'ingredients': dict.fromkeys(keys),
-        'instructions': dict.fromkeys(keys)
+        'ingredients': key_dict,
+        'instructions': key_dict
     })
-    lst = soup.find_all(re.compile('^h[2-6]$'))
-    for i in lst:
+    #strip within the find_all 
+    for i in soup.find_all(re.compile('^h[2-6]$')):
         if (i.text).strip() in instruction_label:
             instructions_header = i
         elif (i.text).strip() in ingredient_label:
             ingredients_header = i
-    ingredients = get_data(ingredients_header, 'ingredients')
-    instructions = get_data(instructions_header, 'instructions')
+    ingredients = parent_height_controller(ingredients_header, 'ingredients')
+    instructions = parent_height_controller(instructions_header, 'instructions')
     context = {
         'base_url': base_url,
         'title': page_title,
@@ -130,5 +113,4 @@ def simplify_recipe(request):
             context['modal'] = 'failed_extraction'
         except requests.exceptions.MissingSchema as err:
             context['modal'] = 'invalid_url'
-
     return render(request, 'simplifyRecipe/recipe_card.html', context)

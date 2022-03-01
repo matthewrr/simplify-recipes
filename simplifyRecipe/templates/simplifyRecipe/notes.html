@@ -19,3 +19,5 @@ url_list = [
 # regularly audit both full pulls for popular websites and simple len of items to see if website design changed.
 
 #account for non-working urls. move json entry to initial call after error handling.
+
+pattern = re.compile(r'[^\x11-\x7f\u00BC-\u00BE]')
